@@ -24,16 +24,19 @@ class ShardedPSDP:
         assert optimizer is not None
         self.optimizer = optimizer
         num_paras, element_size = self._compute_total_para_num()
-        print("Total number of parameters: {}, element size: {}, total size {} MB."
-              .format(num_paras, element_size, num_paras * element_size // 1024 // 1024))
+        print(
+            f"Total number of parameters: {num_paras}, element size: {element_size}, total size {num_paras * element_size // 1024 // 1024} MB."
+        )
 
         assert self.flatten
 #         self.para = list(self.module.parameters())
         self.flatten_para = flatten_params(self.module.parameters(), self.dp_group_size)
-        print("Flattened parameter number: {}, element size: {}."
-              .format(self.flatten_para.data.numel(), self.flatten_para.data.element_size()))
-        print("Flattened parameter grad number: {}, element size: {}."
-              .format(self.flatten_para.grad.numel(), self.flatten_para.grad.element_size()))
+        print(
+            f"Flattened parameter number: {self.flatten_para.data.numel()}, element size: {self.flatten_para.data.element_size()}."
+        )
+        print(
+            f"Flattened parameter grad number: {self.flatten_para.grad.numel()}, element size: {self.flatten_para.grad.element_size()}."
+        )
 
         self.grad_buffer = self._declare_grad_buffer()
 
@@ -59,9 +62,14 @@ class ShardedPSDP:
     def _declare_grad_buffer(self):
         assert self.flatten_para.data.numel() % self.dp_group_size == 0
         chunk_size = self.flatten_para.data.numel() // self.dp_group_size
-        grad_buffer = [torch.zeros(chunk_size, device=self.flatten_para.device, dtype=self.flatten_para.dtype)
-                       for _ in range(self.dp_group_size)]
-        return grad_buffer
+        return [
+            torch.zeros(
+                chunk_size,
+                device=self.flatten_para.device,
+                dtype=self.flatten_para.dtype,
+            )
+            for _ in range(self.dp_group_size)
+        ]
 
     def profile_mark_sync_grad_start(self):
         if self.enable_tidy_profiling:
@@ -101,17 +109,13 @@ class ShardedPSDP:
 
     def profiling_data_parallel(self, init_time_stamp, init_event):
         self.set_time_stamp(init_time_stamp, init_event)
-        profiling_log = []
-
         assert self.flatten
         allreduce_slot = self.sync_gradients_start_event.elapsed_time(self.sync_gradients_ready_event)*1e+3
         allreduce_log = {"name": "opt_shardedPS_sync", "ph": "X", "pid": self.global_rank, "tid": "7. optimizer-comm",
                          "ts": self.get_ts(self.sync_gradients_start_event),
                          "dur": allreduce_slot, "cname": "cq_build_passed",
                          "args": {'para': 'flattened_grad', 'size': self.flatten_para.grad.numel()}}
-        # print(allreduce_log)
-        profiling_log.append(allreduce_log)
-
+        profiling_log = [allreduce_log]
         optimizer_slot = self.optimizer_step_start_event.elapsed_time(self.optimizer_step_ready_event) * 1e+3
         optimizer_log = {"name": "opt_comp", "ph": "X", "pid": self.global_rank, "tid": "8. optimizer-comp",
                          "ts": self.get_ts(self.optimizer_step_start_event), "dur": optimizer_slot, "cname": "bad"}

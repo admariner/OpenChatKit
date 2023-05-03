@@ -13,6 +13,5 @@ def build_gpt2_tokenizer(args):
     return tokenizer
 
 def build_deberta_tokenizer(args):
-    tokenizer = DebertaV2Tokenizer.from_pretrained(args.tokenizer_name)
-    return tokenizer
+    return DebertaV2Tokenizer.from_pretrained(args.tokenizer_name)
     

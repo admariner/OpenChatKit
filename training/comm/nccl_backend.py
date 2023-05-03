@@ -37,10 +37,10 @@ class NCCLCommunicator:
             cuda_id = cupy.cuda.nccl.get_unique_id()
             # print(cuda_id)
             cuda_id_str = np.array(cuda_id).tobytes()
-            self.dist_store.set('group-'+comm_name+'-unique-id', cuda_id_str)
-            # print("Master put <group-"+comm_name+"-unique-id: ", cuda_id_str, ">.")
+            self.dist_store.set(f'group-{comm_name}-unique-id', cuda_id_str)
+                # print("Master put <group-"+comm_name+"-unique-id: ", cuda_id_str, ">.")
         else:
-            cuda_id_str = self.dist_store.get('group-'+comm_name+'-unique-id')
+            cuda_id_str = self.dist_store.get(f'group-{comm_name}-unique-id')
 
         comm_id = tuple(np.frombuffer(cuda_id_str, dtype=int))
         # comm_id = cupy.cuda.nccl.get_unique_id()

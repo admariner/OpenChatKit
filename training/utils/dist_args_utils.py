@@ -97,23 +97,19 @@ def add_parallel_schema_arguments(parser):
     
 
 def get_model_arguments_str(args):
-    return '_l' + str(args.seq_length) + '_m' + str(args.embedding_dim)
+    return f'_l{str(args.seq_length)}_m{str(args.embedding_dim)}'
 
 
 def get_dist_arguments_str(args, add_rank=True):
-    dist_str = '_w' + str(args.world_size) + '_p' + str(args.pipeline_group_size) + "_" + \
-               str(args.gradient_accumulate_step) + '_d' + str(args.data_group_size)
+    dist_str = f'_w{str(args.world_size)}_p{str(args.pipeline_group_size)}_{str(args.gradient_accumulate_step)}_d{str(args.data_group_size)}'
     if add_rank:
-        dist_str = dist_str + '_' + str(args.rank)
+        dist_str = f'{dist_str}_{str(args.rank)}'
     return dist_str
 
 
 def get_learning_arguments_str(args):
-    return '_b' + str(args.batch_size) + '_' + str(args.micro_batch_size)
+    return f'_b{str(args.batch_size)}_{str(args.micro_batch_size)}'
 
 
 def get_mixed_precision_arguments_str(args):
-    if args.fp16:
-        return '_fp16'
-    else:
-        return ''
+    return '_fp16' if args.fp16 else ''

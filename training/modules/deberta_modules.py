@@ -17,8 +17,9 @@ def make_log_bucket_position(relative_pos, bucket_size, max_position):
     mid = bucket_size // 2
     abs_pos = torch.where((relative_pos < mid) & (relative_pos > -mid), mid - 1, torch.abs(relative_pos))
     log_pos = torch.ceil(torch.log(abs_pos / mid) / np.log((max_position - 1) / mid) * (mid - 1)) + mid
-    bucket_pos = torch.where(abs_pos <= mid, relative_pos.type(log_pos.dtype), log_pos * sign).long()
-    return bucket_pos
+    return torch.where(
+        abs_pos <= mid, relative_pos.type(log_pos.dtype), log_pos * sign
+    ).long()
 
 def build_relative_position(query_size, key_size, bucket_size=-1, max_position=-1, device='cpu'):
     q_ids = torch.arange(0, query_size, device=device)
@@ -27,8 +28,7 @@ def build_relative_position(query_size, key_size, bucket_size=-1, max_position=-
     if bucket_size > 0 and max_position > 0:
         rel_pos_ids = make_log_bucket_position(rel_pos_ids, bucket_size, max_position)
     rel_pos_ids = rel_pos_ids[:query_size, :]
-    rel_pos_ids = rel_pos_ids.unsqueeze(0)
-    return rel_pos_ids
+    return rel_pos_ids.unsqueeze(0)
 
 
 from transformers.models.deberta_v2.modeling_deberta_v2 import XSoftmax, StableDropout
@@ -127,10 +127,7 @@ class DisentangledSelfAttention(nn.Module):
         )
         new_context_layer_shape = context_layer.size()[:-2] + (-1,)
         context_layer = context_layer.view(*new_context_layer_shape)
-        if output_attentions:
-            return (context_layer, attention_probs)
-        else:
-            return context_layer
+        return (context_layer, attention_probs) if output_attentions else context_layer
 
     def disentangled_attention_bias(self, query_layer, key_layer, relative_pos, rel_embeddings, scale_factor):
         if relative_pos is None:
@@ -335,5 +332,4 @@ class DebertaClassificationHead(nn.Module):
     def forward(self, hidden_states, input_ids=None):
         pooled_output = self.pooler(hidden_states)
         pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
-        return logits
+        return self.classifier(pooled_output)

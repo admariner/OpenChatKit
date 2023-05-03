@@ -171,7 +171,7 @@ class GPTEmbeddings(nn.Module):
                 model_path, 'pytorch_embs.pt',
             )))
         except:
-            print(f'Cannot load from <model_path>. The model is randomly initialized.')
+            print('Cannot load from <model_path>. The model is randomly initialized.')
         return module
         
     def forward(self, input_ids, *args, **kargs):
@@ -179,8 +179,7 @@ class GPTEmbeddings(nn.Module):
         # input ids
         input_shape = input_ids.size()
         input_ids = input_ids.view(-1, input_shape[-1])
-        hidden_states = self.embed_in(input_ids)
-        return hidden_states
+        return self.embed_in(input_ids)
     
 
 class GPTBlock(_GPTNeoXBlock):
@@ -218,23 +217,18 @@ class GPTBlock(_GPTNeoXBlock):
     
     def forward(self, x: torch.Tensor, layer_past=None, mask=None, **kargs) -> torch.Tensor:
         
-        if mask is not None:
+        if mask is None:
+            attention_mask = None
+
+            offset = layer_past[0].size(2) if layer_past is not None else 0
+        else:
             # bool -> float
             attention_mask = 1e9*(mask[:, None, None, :]-1)
-        else:
-            attention_mask = None
-            
-        if mask is None:
-            if layer_past is not None:
-                offset = layer_past[0].size(2)
-            else:
-                offset = 0
-        else:
             # masked tokens
             offset = (mask-1).sum(-1, keepdims=False)
             if layer_past is not None:
                 offset += layer_past[0].size(2)
-                
+
         if self.training:
             
             if self.use_checkpoint:
@@ -242,11 +236,9 @@ class GPTBlock(_GPTNeoXBlock):
                 x = checkpoint(self.block_forward, x, attention_mask, None)
             else:
                 x = self.block_forward(x, prefix_masks=prefix_masks)
-            
-            return x
-           
+
         else:
-        
+
             residual = x
             ln_out = self.input_layernorm(x)
             attention_layer_outputs = self.attention(
@@ -258,7 +250,8 @@ class GPTBlock(_GPTNeoXBlock):
             mlp_output = self.mlp(self.post_attention_layernorm(x))
             x = mlp_output + attn_output + residual
 
-            return x
+
+        return x
     
     
 class GPTLMHead(nn.Module):

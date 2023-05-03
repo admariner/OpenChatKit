@@ -24,8 +24,9 @@ def gpt_loss_func(input, target):
     lm_logits, labels = input, target
     shift_logits = lm_logits[..., :-1, :].contiguous()
     shift_labels = labels[..., 1:].contiguous()
-    loss = functional.cross_entropy(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-    return loss
+    return functional.cross_entropy(
+        shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+    )
 
 # put things on GPU to avoid high CPU usage
 def fixed_pos_embedding(x, seq_dim=1, seq_len=None):
@@ -80,9 +81,7 @@ class GPTJAttention(_GPTJAttention):
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False, device=device)
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False, device=device)
         self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=False, device=device)
-        self.rotary_dim = None
-        if config.rotary_dim is not None:
-            self.rotary_dim = config.rotary_dim
+        self.rotary_dim = config.rotary_dim if config.rotary_dim is not None else None
             
     def _attn(
         self,
@@ -161,7 +160,7 @@ class GPTJAttention(_GPTJAttention):
             if offset is None:
                 offset = layer_past[0].shape[-2]
             seq_len += layer_past[0].shape[-2]
-            
+
         if offset is None:
             offset = 0
 
@@ -192,11 +191,7 @@ class GPTJAttention(_GPTJAttention):
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
 
-        if use_cache is True:
-            present = (key, value)
-        else:
-            present = None
-
+        present = (key, value) if use_cache is True else None
         # compute self-attention: V x Softmax(QK^T)
         attn_output, attn_weights = self._attn(query, key, value, attention_mask, head_mask, prefix_masks=prefix_masks)
 
@@ -230,7 +225,7 @@ class GPTEmbeddings(nn.Module):
                 model_path, 'pytorch_embs.pt',
             )))
         except:
-            print(f'Cannot load from <model_path>. The model is randomly initialized.')
+            print('Cannot load from <model_path>. The model is randomly initialized.')
         return module
         
     def forward(self, input_ids, *args, **kargs):
@@ -238,8 +233,7 @@ class GPTEmbeddings(nn.Module):
         # input ids
         input_shape = input_ids.size()
         input_ids = input_ids.view(-1, input_shape[-1])
-        hidden_states = self.wte(input_ids)
-        return hidden_states
+        return self.wte(input_ids)
     
 
 class GPTBlock(_GPTJBlock):
@@ -279,33 +273,28 @@ class GPTBlock(_GPTJBlock):
 
     def forward(self, x: torch.Tensor, prefix_masks=None, layer_past=None, mask=None, skip_ln=False, **kargs) -> torch.Tensor:
         
-        if mask is not None:
+        if mask is None:
+            attention_mask = None
+
+            offset = layer_past[0].size(2) if layer_past is not None else 0
+        else:
             # bool -> float
             attention_mask = (1e4)*(mask[:, None, None, :]-1.0)
-        else:
-            attention_mask = None
-            
-        if mask is None:
-            if layer_past is not None:
-                offset = layer_past[0].size(2)
-            else:
-                offset = 0
-        else:
             # masked tokens
             offset = (mask-1).sum(-1, keepdims=False)
             if layer_past is not None:
                 offset += layer_past[0].size(2)
-                
+
         if self.training:
-            
+
             if self.use_checkpoint:
                 x.requires_grad_(True)
                 x = checkpoint(self.block_forward, x, attention_mask, prefix_masks)
             else:
                 x = self.block_forward(x, prefix_masks=prefix_masks)
-            
+
             return x
-           
+
         else:
             res = x
             if not skip_ln:

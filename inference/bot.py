@@ -36,7 +36,7 @@ class StopWordsCriteria(StoppingCriteria):
             # buffer tokens if the partial result ends with a prefix of a stop word, e.g. "<hu"
             for stop_word in self._stop_words:
                 for i in range(1, len(stop_word)):
-                    if self._partial_result.endswith(stop_word[0:i]):
+                    if self._partial_result.endswith(stop_word[:i]):
                         self._stream_buffer += text
                         return False
             self._stream_callback(self._stream_buffer + text)
@@ -127,17 +127,14 @@ class OpenChatKitShell(cmd.Cmd):
         self._model = ChatModel(self._model_name_or_path, self._gpu_id, self._max_memory)
 
         if self._retrieval:
-            print(f"Loading retrieval index...")
+            print("Loading retrieval index...")
             self._index = wp.WikipediaIndex()
 
         self._convo = convo.Conversation(
             self._model.human_id, self._model.bot_id)
 
     def precmd(self, line):
-        if line.startswith('/'):
-            return line[1:]
-        else:
-            return 'say ' + line
+        return line[1:] if line.startswith('/') else f'say {line}'
 
     def do_say(self, arg):
         if self._retrieval:
@@ -259,11 +256,12 @@ def main():
     if args.gpu_vram is None:
         max_memory = None
     else:
-        max_memory = {}
-        for i in range(len(args.gpu_vram)):
-            # assign CUDA ID as label and XGiB as value
-            max_memory[int(args.gpu_vram[i].split(':')[0])] = f"{args.gpu_vram[i].split(':')[1]}GiB"
-
+        max_memory = {
+            int(
+                args.gpu_vram[i].split(':')[0]
+            ): f"{args.gpu_vram[i].split(':')[1]}GiB"
+            for i in range(len(args.gpu_vram))
+        }
         if args.cpu_ram is not None:
             # add cpu to max-memory if given
             max_memory['cpu'] = f"{int(args.cpu_ram)}GiB"

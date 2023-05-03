@@ -22,15 +22,18 @@ class LocalDP:
 
         self.module = module
         num_paras, element_size = self._compute_total_para_num()
-        print("Total number of parameters: {}, element size: {}, total size {} MB."
-              .format(num_paras, element_size, num_paras * element_size // 1024 // 1024))
+        print(
+            f"Total number of parameters: {num_paras}, element size: {element_size}, total size {num_paras * element_size // 1024 // 1024} MB."
+        )
 
         if self.flatten:
             self.flatten_para = flatten_params(self.module.parameters())
-            print("Flattened parameter number: {}, element size: {}."
-                  .format(self.flatten_para.data.numel(), self.flatten_para.data.element_size()))
-            print("Flattened parameter grad number: {}, element size: {}."
-                  .format(self.flatten_para.grad.numel(), self.flatten_para.grad.element_size()))
+            print(
+                f"Flattened parameter number: {self.flatten_para.data.numel()}, element size: {self.flatten_para.data.element_size()}."
+            )
+            print(
+                f"Flattened parameter grad number: {self.flatten_para.grad.numel()}, element size: {self.flatten_para.grad.element_size()}."
+            )
 
         assert optimizer is not None
         self.optimizer = optimizer
@@ -42,8 +45,8 @@ class LocalDP:
             if self.flatten:
                 self.allreduce_gradients_start_event = torch.cuda.Event(enable_timing=True, blocking=False)
             else:
-                self.allreduce_gradients_start_events = dict()
-                self.allreduce_gradients_end_events = dict()
+                self.allreduce_gradients_start_events = {}
+                self.allreduce_gradients_end_events = {}
                 for name, _ in self.module.named_parameters():
                     self.allreduce_gradients_start_events[name] = torch.cuda.Event(enable_timing=True, blocking=False)
                     self.allreduce_gradients_end_events[name] = torch.cuda.Event(enable_timing=True, blocking=False)
@@ -68,9 +71,8 @@ class LocalDP:
                 self.dp_comm_stream.record_event(self.allreduce_gradients_start_events[name])
 
     def profile_mark_allreduce_end(self, name=None):
-        if self.enable_tidy_profiling:
-            if name:
-                self.dp_comm_stream.record_event(self.allreduce_gradients_end_events[name])
+        if self.enable_tidy_profiling and name:
+            self.dp_comm_stream.record_event(self.allreduce_gradients_end_events[name])
 
     def profile_mark_optimizer_step_start(self):
         if self.enable_tidy_profiling:

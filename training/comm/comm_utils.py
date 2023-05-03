@@ -100,22 +100,30 @@ def init_communicators(args):
         # We use pipeline parallel by default.
         _PIPELINE_PARALLEL_WORLD_SIZE = args.pipeline_group_size
         _PIPELINE_PARALLEL_RANK = args.rank % args.pipeline_group_size
-        _PIPELINE_PARALLEL_COMM = NCCLCommunicator(_PIPELINE_PARALLEL_RANK, args.cuda_id, args.pipeline_group_size,
-                                                   "pipeline_group_"+str(args.rank // args.pipeline_group_size))
+        _PIPELINE_PARALLEL_COMM = NCCLCommunicator(
+            _PIPELINE_PARALLEL_RANK,
+            args.cuda_id,
+            args.pipeline_group_size,
+            f"pipeline_group_{str(args.rank // args.pipeline_group_size)}",
+        )
         if args.data_group_size != 1:
             _DATA_PARALLEL_WORLD_SIZE = args.data_group_size
             _DATA_PARALLEL_RANK = args.rank // args.pipeline_group_size
-            
+
             dp_backend = getattr(args, 'dp_backend', 'gloo')
             if dp_backend == 'nccl':
-            
-                _DATA_PARALLEL_COMM = NCCLCommunicator(_DATA_PARALLEL_RANK, args.cuda_id, args.data_group_size,
-                                                       "data_group_"+str(args.rank % args.pipeline_group_size))
-            
+
+                _DATA_PARALLEL_COMM = NCCLCommunicator(
+                    _DATA_PARALLEL_RANK,
+                    args.cuda_id,
+                    args.data_group_size,
+                    f"data_group_{str(args.rank % args.pipeline_group_size)}",
+                )
+
             elif dp_backend == 'gloo':
                 
                 for i in range(args.pipeline_group_size):
-                    ranks = [rank for rank in range(i, args.world_size, args.pipeline_group_size)]
+                    ranks = list(range(i, args.world_size, args.pipeline_group_size))
                     print(args.rank, ranks)
                     data_group = torch.distributed.new_group(ranks, backend='gloo')
                     if args.rank in ranks:
@@ -127,29 +135,12 @@ def init_communicators(args):
                             data_group, to_global_rank=to_global_rank, 
                             dp_rank=_DATA_PARALLEL_RANK,
                             comm_group_size=args.data_group_size,)
-            
+
             else:
                 assert False
-            
+
         print('comm init done!!')
-            
-    # elif args.world_size == args.data_group_size * args.tensor_group_size:
-    #    global _DATA_PARALLEL_COMM
-    #    global _TENSOR_PARALLEL_COMM
-    #    global _DATA_PARALLEL_RANK
-    #    global _TENSOR_PARALLEL_RANK
-    #    global _DATA_PARALLEL_WORLD_SIZE
-    #    global _TENSOR_PARALLEL_WORLD_SIZE
-        # We use megatron tensor parallel by default.
-    #    _TENSOR_PARALLEL_WORLD_SIZE = args.tensor_group_size
-    #    _TENSOR_PARALLEL_RANK = args.rank % args.tensor_group_size
-    #    _TENSOR_PARALLEL_COMM = NCCLCommunicator(_TENSOR_PARALLEL_RANK, args.cuda_id, args.tensor_group_size,
-    #                                             "tensor_group_" + str(args.rank // args.tensor_group_size))
-    #    if args.data_group_size != 1:
-    #        _DATA_PARALLEL_WORLD_SIZE = args.data_group_size
-    #        _DATA_PARALLEL_RANK = args.rank // args.tensor_group_size
-    #        _DATA_PARALLEL_COMM = NCCLCommunicator(_DATA_PARALLEL_RANK, args.cuda_id, args.data_group_size,
-    #                                              "data_group_" + str(args.rank % args.tensor_group_size))
+
     else:
         print("Not supported yet")
         assert False
@@ -159,7 +150,7 @@ def init_communicators(args):
 def reinit_dp_communicator(args):
     
     print('###### reinit start #######')
-    
+
     default_init(args)
     assert args.world_size == args.data_group_size * args.pipeline_group_size
     if args.world_size == args.data_group_size * args.pipeline_group_size:
@@ -175,18 +166,18 @@ def reinit_dp_communicator(args):
         global _PIPELINE_PARALLEL_RANK
         global _DATA_PARALLEL_WORLD_SIZE
         global _PIPELINE_PARALLEL_WORLD_SIZE
-        
+
         if args.data_group_size != 1:
             
             dp_backend = getattr(args, 'dp_backend', 'gloo')
             if dp_backend == 'nccl':
-            
+
                 raise Exception('NCCL cannot reinit.')
-            
+
             elif dp_backend == 'gloo':
                 
                 for i in range(args.pipeline_group_size):
-                    ranks = [rank for rank in range(i, args.world_size, args.pipeline_group_size)]
+                    ranks = list(range(i, args.world_size, args.pipeline_group_size))
                     print(args.rank, ranks)
                     data_group = torch.distributed.new_group(ranks, backend='gloo')
                     if args.rank in ranks:
@@ -198,8 +189,8 @@ def reinit_dp_communicator(args):
                             data_group, to_global_rank=to_global_rank, 
                             dp_rank=_DATA_PARALLEL_RANK,
                             comm_group_size=args.data_group_size,)
-            
+
             else:
                 assert False
-            
+
         print('######## dp comm reinit done!! ########')
