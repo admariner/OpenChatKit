@@ -54,7 +54,7 @@ def benchmark(model_dict: dict, device_name: str, repeat_infer: int):
         model_download_start_time = time.time()
         model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float16, torchscript=True, force_download=True)
         model_download_end_time = time.time()
-        
+
         model = None
 
         # Measure the time it takes to load the model into main memory
@@ -96,7 +96,7 @@ def benchmark(model_dict: dict, device_name: str, repeat_infer: int):
 
         # Measure the time it takes to run inference from a cold start
         inference_warm_start_time = time.time()
-        for i in range(0, repeat_infer):
+        for _ in range(0, repeat_infer):
             inputs = tokenizer("Hello, world!", return_tensors="pt").to(device)
             outputs = model(**inputs)
         inference_warm_end_time = time.time()

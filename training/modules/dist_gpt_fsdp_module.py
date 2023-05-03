@@ -46,10 +46,16 @@ class GPTGlueFsdpModel(torch.nn.Module):
         super(GPTGlueFsdpModel, self).__init__()
         self.embedding = GPTEmbedding(vocab_size, args.embedding_dim, args.seq_length)
 
-        module_list = []
-        for _ in range(args.num_layers):
-            module_list.append(GPTTransformerFsdpLayer(args.embedding_dim, args.num_heads,
-                                                       args.embedding_dim * 4, use_checkpoint, explicit_fsdp=False))
+        module_list = [
+            GPTTransformerFsdpLayer(
+                args.embedding_dim,
+                args.num_heads,
+                args.embedding_dim * 4,
+                use_checkpoint,
+                explicit_fsdp=False,
+            )
+            for _ in range(args.num_layers)
+        ]
         self.transformers = torch.nn.Sequential(*module_list)
         self.classifier = GlueClassification(args.embedding_dim, num_classes)
 
@@ -100,13 +106,13 @@ class GPTFsdpStageFirst(GPTFsdpStageBase):
                                                 explicit_fsdp)
         self.device = device
         module_list = [self._create_first_layer()]
-        for _ in range(self._num_layers):
-            module_list.append(self._create_fsdp_transformer_layer())
+        module_list.extend(
+            self._create_fsdp_transformer_layer() for _ in range(self._num_layers)
+        )
         self.model = torch.nn.Sequential(*module_list).to(device)
 
     def forward(self, x):
-        out = self.model(x)
-        return out
+        return self.model(x)
 
 
 class GPTFsdpStageMiddle(GPTFsdpStageBase):
@@ -114,14 +120,13 @@ class GPTFsdpStageMiddle(GPTFsdpStageBase):
         super(GPTFsdpStageMiddle, self).__init__(args, num_stage_layers, vocab_size, num_classes, use_checkpoint,
                                                  explicit_fsdp)
         self.device = device
-        module_list = []
-        for _ in range(self._num_layers):
-            module_list.append(self._create_fsdp_transformer_layer())
+        module_list = [
+            self._create_fsdp_transformer_layer() for _ in range(self._num_layers)
+        ]
         self.model = torch.nn.Sequential(*module_list).to(device)
 
     def forward(self, x):
-        out = self.model(x)
-        return out
+        return self.model(x)
 
 
 class GPTFsdpStageLast(GPTFsdpStageBase):
@@ -129,12 +134,11 @@ class GPTFsdpStageLast(GPTFsdpStageBase):
         super(GPTFsdpStageLast, self).__init__(args, num_stage_layers, vocab_size, num_classes, use_checkpoint,
                                                explicit_fsdp)
         self.device = device
-        module_list = []
-        for _ in range(self._num_layers):
-            module_list.append(self._create_fsdp_transformer_layer())
+        module_list = [
+            self._create_fsdp_transformer_layer() for _ in range(self._num_layers)
+        ]
         module_list.append(self._create_last_layer())
         self.model = torch.nn.Sequential(*module_list).to(device)
 
     def forward(self, x):
-        out = self.model(x)
-        return out
+        return self.model(x)

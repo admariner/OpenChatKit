@@ -10,7 +10,7 @@ def _assert_contiguous(tensors):
 
 
 def flatten_params(param_set, chunk=None):
-    params = [p for p in param_set]
+    params = list(param_set)
     weights = [p.data for p in params]
     grads = [p.grad.data if p.grad is not None else torch.zeros_like(p.data) for p in params]
     sizes = [p.numel() for p in params]
@@ -53,7 +53,7 @@ def flatten_params(param_set, chunk=None):
     
 
 def flatten_tensors(tensor_set, chunk=None):
-    tensors = [p for p in tensor_set]
+    tensors = list(tensor_set)
     weights = [p.data for p in tensors]
     sizes = [p.numel() for p in tensors]
     total_size = sum(sizes)

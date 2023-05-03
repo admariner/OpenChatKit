@@ -44,12 +44,13 @@ class TorchCommunicator:
              tensor: torch.Tensor,
              dst: int,
              stream=None):
-        # print("Send tensor of size:", torch.numel(tensor))
-        if tensor.device == torch.device('cpu'):
-            handler = dist.isend(tensor, self.to_global_rank(dst), group=self.process_group)
-        else:
-            handler = dist.isend(tensor.cpu(), self.to_global_rank(dst), group=self.process_group)
-        return handler
+        return (
+            dist.isend(tensor, self.to_global_rank(dst), group=self.process_group)
+            if tensor.device == torch.device('cpu')
+            else dist.isend(
+                tensor.cpu(), self.to_global_rank(dst), group=self.process_group
+            )
+        )
 
     def irecv(self,
              tensor: torch.Tensor,

@@ -43,21 +43,25 @@ def load_decentralized_checkpoint(model, checkpoint_path, n_stages=2, n_layer_pe
         checkpoint = torch.load(os.path.join(input_path, f'prank_{i}_checkpoint.pt'), map_location=torch.device("cpu"))
 
         if i == 0:
-            _tmp = {k[len(f"{0}."):]:v for k,v in checkpoint.items() if k.startswith(f"0.")}
+            _tmp = {k[len('0.'):]: v for k,v in checkpoint.items() if k.startswith("0.")}
             # torch.save(_tmp, os.path.join(output_path, f'pytorch_embs.pt'))
             model.gpt_neox.embed_in.weight.data[:] = _tmp['embed_in.weight']
 
             for j in range(n_layer_per_stage):
-                _tmp = {k[len(f"{j+1}."):]:v for k,v in checkpoint.items() if k.startswith(f"{j+1}.")}
-                if len(_tmp) == 0:
-                    break
-                # torch.save(_tmp, os.path.join(output_path, f'pytorch_{j}.pt'))
-                model.gpt_neox.layers[j].load_state_dict(_tmp)
+                if _tmp := {
+                    k[len(f"{j+1}.") :]: v
+                    for k, v in checkpoint.items()
+                    if k.startswith(f"{j+1}.")
+                }:
+                    # torch.save(_tmp, os.path.join(output_path, f'pytorch_{j}.pt'))
+                    model.gpt_neox.layers[j].load_state_dict(_tmp)
 
+                else:
+                    break
         elif i == n_stages - 1:
             for j in range(n_layer_per_stage):
                 _tmp = {k[len(f"{j}."):]:v for k,v in checkpoint.items() if k.startswith(f"{j}.")}
-                if len(_tmp) == 0:
+                if not _tmp:
                     break
                 # torch.save(_tmp, os.path.join(output_path, f'pytorch_{i*n_layer_per_stage + j}.pt'))
                 model.gpt_neox.layers[i*n_layer_per_stage + j].load_state_dict(_tmp)
@@ -66,7 +70,7 @@ def load_decentralized_checkpoint(model, checkpoint_path, n_stages=2, n_layer_pe
                     break
 
             _tmp = {k[len(f"{j}."):]:v for k,v in checkpoint.items() if k.startswith(f"{j}.")}
-            if len(_tmp) == 0:
+            if not _tmp:
                 break
             # torch.save(_tmp, os.path.join(output_path, f'pytorch_lm_head.pt'))
             model.gpt_neox.final_layer_norm.weight.data[:] = _tmp['final_layer_norm.weight']
@@ -77,12 +81,16 @@ def load_decentralized_checkpoint(model, checkpoint_path, n_stages=2, n_layer_pe
 
         else:
             for j in range(n_layer_per_stage):
-                _tmp = {k[len(f"{j}."):]:v for k,v in checkpoint.items() if k.startswith(f"{j}.")}
-                if len(_tmp) == 0:
-                    break
-                # torch.save(_tmp, os.path.join(output_path, f'pytorch_{i*n_layer_per_stage + j}.pt'))
-                model.gpt_neox.layers[i*n_layer_per_stage + j].load_state_dict(_tmp)
+                if _tmp := {
+                    k[len(f"{j}.") :]: v
+                    for k, v in checkpoint.items()
+                    if k.startswith(f"{j}.")
+                }:
+                    # torch.save(_tmp, os.path.join(output_path, f'pytorch_{i*n_layer_per_stage + j}.pt'))
+                    model.gpt_neox.layers[i*n_layer_per_stage + j].load_state_dict(_tmp)
 
+                else:
+                    break
     return model
 
 

@@ -17,25 +17,24 @@ class GPTStageBase(nn.Module):
         self._num_layers = args.num_layers
         self._layer_begin = get_pipeline_parallel_rank() * args.num_layers
         self._layer_end = min(self._layer_begin + args.num_layers, args.max_layers)
-        
+
         self._task_type = getattr(args, 'task_type', 'language_model')
-        
+
         self.load_pretrained_model = args.load_pretrained_model
         self.model_name = args.model_name
         self.config = config
-        
-        if hasattr(args, 'model_type'):
-            if args.model_type == "gpt2":
-                from .hf_gpt2_modules import GPTEmbeddings, GPTBlock, GPTLMHead
-            elif args.model_type == "gptj":
-                from .hf_gptj_modules import GPTEmbeddings, GPTBlock, GPTLMHead
-            elif args.model_type == "gptneox":
-                from .hf_gptneox_modules import GPTEmbeddings, GPTBlock, GPTLMHead
-            else:
-                raise Exception("unknown")
-        else:
+
+        if not hasattr(args, 'model_type'):
             raise Exception("!!!! model type not defined")
-            
+
+        if args.model_type == "gpt2":
+            from .hf_gpt2_modules import GPTEmbeddings, GPTBlock, GPTLMHead
+        elif args.model_type == "gptj":
+            from .hf_gptj_modules import GPTEmbeddings, GPTBlock, GPTLMHead
+        elif args.model_type == "gptneox":
+            from .hf_gptneox_modules import GPTEmbeddings, GPTBlock, GPTLMHead
+        else:
+            raise Exception("unknown")
         self._GPTEmbeddings = GPTEmbeddings
         self._GPTBlock = GPTBlock
         self._GPTLMHead = GPTLMHead
@@ -74,11 +73,11 @@ class GPTStageFull(GPTStageBase):
         super(GPTStageFull, self).__init__(args, config)
         self.device = device
         module_list = [self._create_first_layer()]
-        for layer_idx in range(self._layer_begin, self._layer_end):
-            module_list.append(self._create_transformer_layer(layer_idx=layer_idx))
-        if hasattr(args, 'skip_lm_head') and args.skip_lm_head:
-            pass
-        else:
+        module_list.extend(
+            self._create_transformer_layer(layer_idx=layer_idx)
+            for layer_idx in range(self._layer_begin, self._layer_end)
+        )
+        if not hasattr(args, 'skip_lm_head') or not args.skip_lm_head:
             module_list.append(self._create_last_layer())
         self.model = nn.Sequential(*module_list).to(device)
 
@@ -93,8 +92,10 @@ class GPTStageFirst(GPTStageBase):
         super(GPTStageFirst, self).__init__(args, config)
         self.device = device
         module_list = [self._create_first_layer()]
-        for layer_idx in range(self._layer_begin, self._layer_end):
-            module_list.append(self._create_transformer_layer(layer_idx=layer_idx))
+        module_list.extend(
+            self._create_transformer_layer(layer_idx=layer_idx)
+            for layer_idx in range(self._layer_begin, self._layer_end)
+        )
         self.model = nn.Sequential(*module_list).to(device)
 
     def forward(self, x, **kargs):
@@ -109,9 +110,10 @@ class GPTStageMiddle(GPTStageBase):
     def __init__(self, args, config, device):
         super(GPTStageMiddle, self).__init__(args, config)
         self.device = device
-        module_list = []
-        for layer_idx in range(self._layer_begin, self._layer_end):
-            module_list.append(self._create_transformer_layer(layer_idx=layer_idx))
+        module_list = [
+            self._create_transformer_layer(layer_idx=layer_idx)
+            for layer_idx in range(self._layer_begin, self._layer_end)
+        ]
         self.model = nn.Sequential(*module_list).to(device)
 
     def forward(self, x, **kargs):
@@ -126,15 +128,13 @@ class GPTStageLast(GPTStageBase):
     def __init__(self, args, config, device):
         super(GPTStageLast, self).__init__(args, config)
         self.device = device
-        module_list = []
-        for layer_idx in range(self._layer_begin, self._layer_end):
-            module_list.append(self._create_transformer_layer(layer_idx=layer_idx))
-            
-        if hasattr(args, 'skip_lm_head') and args.skip_lm_head:
-            pass
-        else:
+        module_list = [
+            self._create_transformer_layer(layer_idx=layer_idx)
+            for layer_idx in range(self._layer_begin, self._layer_end)
+        ]
+        if not hasattr(args, 'skip_lm_head') or not args.skip_lm_head:
             module_list.append(self._create_last_layer())
-        
+
         self.model = nn.Sequential(*module_list).to(device)
         
         # self.upscale_last = nn.Linear(args.embedding_dim, 9216).to(device)

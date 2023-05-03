@@ -15,8 +15,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 
 def mean_pooling(token_embeddings, mask):
     token_embeddings = token_embeddings.masked_fill(~mask[..., None].bool(), 0.)
-    sentence_embeddings = token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
-    return sentence_embeddings
+    return token_embeddings.sum(dim=1) / mask.sum(dim=1)[..., None]
 
 def cos_sim_2d(x, y):
     norm_x = x / np.linalg.norm(x, axis=1, keepdims=True)

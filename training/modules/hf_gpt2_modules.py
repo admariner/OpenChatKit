@@ -23,8 +23,9 @@ def gpt_loss_func(input, target):
     lm_logits, labels = input, target
     shift_logits = lm_logits[..., :-1, :].contiguous()
     shift_labels = labels[..., 1:].contiguous()
-    loss = functional.cross_entropy(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-    return loss
+    return functional.cross_entropy(
+        shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+    )
 
 
 class GPTEmbeddings(nn.Module):
@@ -141,11 +142,7 @@ class GPTAttention(_GPT2Attention):
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
 
-        if use_cache is True:
-            present = (key, value)
-        else:
-            present = None
-
+        present = (key, value) if use_cache is True else None
         if self.reorder_and_upcast_attn:
             attn_output, attn_weights = self._upcast_and_reordered_attn(query, key, value, attention_mask, head_mask)
         else:
@@ -307,12 +304,10 @@ class GPTClassificationHead(nn.Module):
             sequence_lengths = torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
         else:
             sequence_lengths = -1
-        
+
         pooled_hidden_states = hidden_states[torch.arange(batch_size, device=hidden_states.device), sequence_lengths]
-        
-        logits = self.score(self.ln_f(pooled_hidden_states))
-        
-        return logits
+
+        return self.score(self.ln_f(pooled_hidden_states))
         
 class GPTForClassification(_GPT2ForSequenceClassification):
     

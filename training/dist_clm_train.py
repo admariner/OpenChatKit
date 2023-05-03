@@ -261,19 +261,19 @@ def main():
                         type=str, default="0", metavar='S',
                         help='an uuid')
     args = parser.parse_args()
-    
+
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    
+
     if args.use_cuda:
         assert (torch.cuda.is_available())
         device = torch.device('cuda', args.cuda_id)
     else:
         device = torch.device('cpu')
-        
+
     init_communicators(args)
-    
+
     use_dp = (args.world_size != args.pipeline_group_size)
     if use_dp:
         dp_comm = get_data_parallel_comm()
@@ -282,9 +282,9 @@ def main():
     else:
         dp_rank = 0
         dp_size = 1
-    
+
     config = AutoConfig.from_pretrained(args.model_name)
-    
+
     # num layer globally
     if hasattr(config, 'num_hidden_layers'):
         args.max_layers = config.num_hidden_layers
@@ -292,7 +292,7 @@ def main():
         args.max_layers = config.num_layers 
     else:
         args.max_layers = config.n_layer
-    
+
     tokenizer = build_tokenizer(args)
     tokenizer.model_max_length = args.seq_length
     # config.vocab_size = tokenizer.vocab_size
@@ -300,28 +300,28 @@ def main():
     config.eos_token_id = tokenizer.eos_token_id
     config.pad_token_id = tokenizer.pad_token_id
     print("token vocab size:", config.vocab_size)
-    
+
     if get_pipeline_parallel_rank() == 0 and dp_rank == 0:
         train_data_loader = get_train_data_loader(args, tokenizer)
     else:
         train_data_loader = None
-        
+
     if args.evaluation_data is not None and dp_rank == 0:
         test_data_loader = get_eval_data_loader(args, tokenizer)
     else:
         test_data_loader = None
-        
+
     if args.total_steps is None:
         args.total_steps = len(train_data_loader)
-    
+
     use_dp = (args.world_size != args.pipeline_group_size)
     if use_dp:
         print("Running ", args.pp_mode, " with data parallel.")
     else:
         print("Running ", args.pp_mode, " without data parallel.")
-    
+
     pipe = get_pp_module(args, config, device, use_dp)
-    
+
     if args.load_checkpoint:
         load_checkpoint(pipe, args)
 
@@ -331,9 +331,9 @@ def main():
     if args.profiling == 'no-profiling':
         train_loop(args, pipe, device, train_data_loader, test_data_loader)
     else:
-        prefix = './trace_json/gpt3_' + args.pp_mode
+        prefix = f'./trace_json/gpt3_{args.pp_mode}'
         if use_dp:
-            prefix = prefix + '_' + args.dp_mode
+            prefix = f'{prefix}_{args.dp_mode}'
         trace_file = prefix + get_learning_arguments_str(args) + get_model_arguments_str(args) + \
                      get_dist_arguments_str(args) + get_mixed_precision_arguments_str(args) + '_' + \
                      args.profiling + '_' + args.trace_postfix + '.json'
@@ -342,7 +342,6 @@ def main():
                 train_loop(args, pipe, device, train_data_loader, test_data_loader)
             except Exception as e:
                 raise e
-                print(get_pipeline_parallel_rank(), e)
             pipe.export_profiling_result(filename=trace_file)
         elif args.profiling == 'pytorch_profiling':
             with profiler.profile(profile_memory=True, use_cuda=args.use_cuda) as prof:

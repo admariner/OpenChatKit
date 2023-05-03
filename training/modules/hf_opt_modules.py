@@ -99,16 +99,13 @@ class GPTEmbeddings(nn.Module):
     def forward(self, input_ids, past_layer=None, mask=None, **kargs):
         
         if mask is None:
-            if past_layer is not None:
-                past_length = past_layer[0].size(2)
-            else:
-                past_length = 0
+            past_length = past_layer[0].size(2) if past_layer is not None else 0
         else:
             # masked tokens
             past_length = (mask-1).sum(-1, keepdims=True)
             if past_layer is not None:
                 past_length += past_layer[0].size(2)
-                
+
         device = input_ids.device
         # input ids
         input_shape = input_ids.size()
@@ -116,7 +113,7 @@ class GPTEmbeddings(nn.Module):
         batch_size = input_ids.shape[0]
 
         inputs_embeds = self.embed_tokens(input_ids)
-        
+
         # attention_mask = torch.ones(inputs_embeds.shape[:2], dtype=torch.bool, device=inputs_embeds.device)
         # position_embeds = self.embed_positions(attention_mask, past_length)
         # position ids
@@ -125,19 +122,15 @@ class GPTEmbeddings(nn.Module):
         position_ids = position_ids.unsqueeze(0).view(-1, input_shape[-1])
         position_ids = position_ids + past_length + self.embed_positions.offset
         position_ids[position_ids<0] = 0
-        
+
         position_embeds = F.embedding(
             position_ids, self.embed_positions.weight, self.embed_positions.padding_idx, self.embed_positions.max_norm,
             self.embed_positions.norm_type, self.embed_positions.scale_grad_by_freq, self.embed_positions.sparse)
-        
+
         if self.project_in is not None:
             inputs_embeds = self.project_in(inputs_embeds)
-        
-        hidden_states = inputs_embeds + position_embeds
 
-        # hidden_states = self.drop(hidden_states)
-
-        return hidden_states
+        return inputs_embeds + position_embeds
     
 
 class OPTAttention(_OPTAttention):
@@ -376,19 +369,16 @@ class GPTBlock(OPTDecoderLayer):
 
     def forward(self, x: torch.Tensor, layer_past=None, mask=None, *args, **kargs) -> torch.Tensor:
         
-        if layer_past is not None:
-            past_length = layer_past[0].size(2)
-        else:
-            past_length = 0
+        past_length = layer_past[0].size(2) if layer_past is not None else 0
         if mask is None:
             mask = torch.ones((x.size(0), x.size(1)+past_length), 
                 dtype=torch.bool, device=x.device)
         attention_mask = _prepare_decoder_attention_mask(
             mask, x.shape[:2], x, past_length
         )
-        
+
         if self.training:
-            
+
             if self.use_checkpoint:
                 x.requires_grad_(True)
                 x = checkpoint(self.attn_res, x, attention_mask)
@@ -400,9 +390,9 @@ class GPTBlock(OPTDecoderLayer):
                 x = checkpoint(self.mlp_res, x)
             else:
                 x = self.mlp_res(x)
-            
+
             return x
-        
+
         else:
 
             hidden_states = x # alias

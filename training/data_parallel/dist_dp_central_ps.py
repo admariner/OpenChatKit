@@ -20,15 +20,18 @@ class CentralPSDP:
 
         self.module = module
         num_paras, element_size = self._compute_total_para_num()
-        print("Total number of parameters: {}, element size: {}, total size {} MB."
-              .format(num_paras, element_size, num_paras * element_size // 1024 // 1024))
+        print(
+            f"Total number of parameters: {num_paras}, element size: {element_size}, total size {num_paras * element_size // 1024 // 1024} MB."
+        )
 
         if self.flatten:
             self.flatten_para = flatten_params(self.module.parameters())
-            print("Flattened parameter number: {}, element size: {}."
-                  .format(self.flatten_para.data.numel(), self.flatten_para.data.element_size()))
-            print("Flattened parameter grad number: {}, element size: {}."
-                  .format(self.flatten_para.grad.numel(), self.flatten_para.grad.element_size()))
+            print(
+                f"Flattened parameter number: {self.flatten_para.data.numel()}, element size: {self.flatten_para.data.element_size()}."
+            )
+            print(
+                f"Flattened parameter grad number: {self.flatten_para.grad.numel()}, element size: {self.flatten_para.grad.element_size()}."
+            )
 
         assert optimizer is not None
         self.optimizer = optimizer
@@ -42,10 +45,10 @@ class CentralPSDP:
                 self.reduce_gradients_end_event = torch.cuda.Event(enable_timing=True, blocking=False)
                 self.broadcast_reduced_grad_start_event = torch.cuda.Event(enable_timing=True, blocking=False)
             else:
-                self.reduce_gradients_start_events = dict()
-                self.reduce_gradients_end_events = dict()
-                self.broadcast_reduced_grad_start_events = dict()
-                self.broadcast_reduced_grad_end_events = dict()
+                self.reduce_gradients_start_events = {}
+                self.reduce_gradients_end_events = {}
+                self.broadcast_reduced_grad_start_events = {}
+                self.broadcast_reduced_grad_end_events = {}
 
                 for name, _ in self.module.named_parameters():
                     self.reduce_gradients_start_events[name] = torch.cuda.Event(enable_timing=True, blocking=False)
@@ -90,9 +93,8 @@ class CentralPSDP:
                 self.dp_comm_stream.record_event(self.broadcast_reduced_grad_start_events[name])
             
     def profile_mark_broadcast_end(self, name=None):
-        if self.enable_tidy_profiling:
-            if name:
-                self.dp_comm_stream.record_event(self.broadcast_reduced_grad_end_events[name])
+        if self.enable_tidy_profiling and name:
+            self.dp_comm_stream.record_event(self.broadcast_reduced_grad_end_events[name])
 
     def _reduce_gradients(self):
         with torch.cuda.stream(self.dp_comm_stream):

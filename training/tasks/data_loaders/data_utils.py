@@ -32,8 +32,7 @@ from comm.comm_utils import *
 def random_chunk(li, min_chunk=1, max_chunk=5):
     it = iter(li)
     while True:
-        nxt = list(islice(it,randint(min_chunk,max_chunk)))
-        if nxt:
+        if nxt := list(islice(it, randint(min_chunk, max_chunk))):
             yield nxt
         else:
             break
@@ -206,10 +205,7 @@ class StreamDataset(IterableDataset):
                 }
                 
     def get_stream(self):
-        if self.cycling:
-            return cycle(self.get_sequence())
-        else:
-            return self.get_sequence()
+        return cycle(self.get_sequence()) if self.cycling else self.get_sequence()
     
     def __iter__(self):
         if self.it is None:
@@ -240,26 +236,25 @@ class StreamDatasetList(IterableDataset):
         
         iterators = [cycle(d.get_sequence()) for d in self.datasets]
         prob_ths = np.cumsum([p / sum(self.sample_probs) for p in self.sample_probs])
-        
+
         global_i = 0
-        
+
         while True:
             
             p = random.random()
-            
+
             for task_name, it, th in zip(self.task_names, iterators, prob_ths):
                 if p < th:
                     
                     inputs = next(it)
-                    
+
                     if self.post_processor is not None:
                         inputs = self.post_processor(inputs)
-                    
-                    if SHOW_DATA:
-                        if global_i % self.print_sample_every_n == 0:
-                            print(p, th)
-                            print(f"**{task_name}**:", self.tokenizer.decode(inputs['input_ids']))
-                        
+
+                    if SHOW_DATA and global_i % self.print_sample_every_n == 0:
+                        print(p, th)
+                        print(f"**{task_name}**:", self.tokenizer.decode(inputs['input_ids']))
+
                     yield inputs
                     global_i += 1
                     break
@@ -344,25 +339,25 @@ def get_eval_data_loader(args, tokenizer, num_workers=1, state_dict=None):
     task_names = []
     datasets = []
     probs = []
-    
+
     print('data_utils: parse task_list')
-    
+
     evaluation_data = args.evaluation_data
-    
+
     if evaluation_data is None:
         return None
-    
+
     dataset = name_to_dataset_eval(evaluation_data, tokenizer, args)
-    
-    train_data_loader = torch.utils.data.DataLoader(dataset,
-                                                    batch_size=args.batch_size,
-                                                    shuffle=False,
-                                                    drop_last=True,
-                                                    num_workers=num_workers,
-                                                    pin_memory=True,
-                                                    collate_fn=None)
-    
-    return train_data_loader
+
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        drop_last=True,
+        num_workers=num_workers,
+        pin_memory=True,
+        collate_fn=None,
+    )
 
 
 def get_ul2r_train_data_loader(args, tokenizer, num_workers=1, state_dict=None):
